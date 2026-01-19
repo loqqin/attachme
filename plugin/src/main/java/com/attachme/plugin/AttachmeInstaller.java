@@ -1,5 +1,6 @@
 package com.attachme.plugin;
 
+import com.attachme.agent.AttachmeServer;
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.util.io.FileUtil;
@@ -8,7 +9,6 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import com.attachme.agent.*;
 
 public class AttachmeInstaller {
 
