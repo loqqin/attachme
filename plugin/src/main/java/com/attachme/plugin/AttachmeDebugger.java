@@ -23,7 +23,8 @@ public class AttachmeDebugger {
 
   public static void attach(Project project, RemoteConnection con, Integer pid) {
     RunnerAndConfigurationSettings runSettings =
-      RunManager.getInstance(project).createConfiguration("Attachme pid: " + pid, ProcessAttachRunConfigurationType.FACTORY);
+      RunManager.getInstance(project).createConfiguration("Attachme pid owner: " + pid, ProcessAttachRunConfigurationType.FACTORY);
+    runSettings.setActivateToolWindowBeforeRun(false);
     ((ProcessAttachRunConfiguration) runSettings.getConfiguration()).connection = con;
     ProgramRunnerUtil.executeConfiguration(runSettings, new ProcessAttachDebugExecutor());
   }

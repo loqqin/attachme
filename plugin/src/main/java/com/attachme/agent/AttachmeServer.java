@@ -47,9 +47,12 @@ public class AttachmeServer implements Runnable {
     listener.onFinished();
   }
 
+  public static Console lastConsole;
+
   private void runServer() throws IOException, ClassNotFoundException {
     try (ServerSocket server = new ServerSocket(this.port)) {
       server.setSoTimeout(500);
+      lastConsole = log;
       this.log.info("AttachMe listening for debuggee processes on port " + this.port);
       while (!Thread.currentThread().isInterrupted()) {
         try (Socket accept = server.accept()) {
@@ -88,7 +91,7 @@ public class AttachmeServer implements Runnable {
     Console dummy = new Console() {
       @Override
       public void info(String str) {
-        System.out.println(str);
+        System.out.println("info " + str);
       }
 
       @Override

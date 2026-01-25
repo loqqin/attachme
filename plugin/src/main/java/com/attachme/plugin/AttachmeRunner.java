@@ -18,6 +18,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class AttachmeRunner implements RunProfileState, AttachmeServer.Listener {
 
@@ -57,14 +62,33 @@ public class AttachmeRunner implements RunProfileState, AttachmeServer.Listener 
     return new DefaultExecutionResult(console, this.procHandler);
   }
 
+  public static long delay = 0;
+
   @Override
   public void onDebuggeeProcess(ProcessRegisterMsg msg, String debuggeeAddress) {
     if (msg.getPorts().isEmpty()) {
       procHandler.notifyTextAvailable("Received message with no ports", ProcessOutputType.STDERR);
       return;
     }
-    RemoteConnection config = new RemoteConnection(true, debuggeeAddress, msg.getPorts().get(0) + "", false);
-    AttachmeDebugger.attach(project, config, msg.getPid());
+    if (delay == 0) {
+      String home = System.getenv("HOME");
+      System.out.println("home = " + (home));
+      try {
+        List<String> strings = Files.readAllLines(Path.of(home + "/.attachme/ATTACHME_DELAY"));
+        System.out.println("strings = " + (strings));
+        delay = Long.parseLong(strings.getFirst());
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }
+    AttachmeServer.lastConsole.info("current attach delay: " +delay);
+    new Timer("").schedule(new TimerTask() {
+      @Override
+      public void run() {
+        RemoteConnection config = new RemoteConnection(true, debuggeeAddress, msg.getPorts().get(0) + "", false);
+        AttachmeDebugger.attach(project, config, msg.getPid());
+      }
+    }, delay);
   }
 
   @Override
