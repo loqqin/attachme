@@ -25,7 +25,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-      intellijIdea("2025.3.1.1")
+      intellijIdea("2026.1")
         bundledPlugin("com.intellij.java")
     }
 }
@@ -36,8 +36,8 @@ dependencies {
 tasks {
     patchPluginXml {
         changeNotes.set("")
-        sinceBuild.set("253")
-        untilBuild.set("253.*")
+        sinceBuild.set("261")
+        untilBuild.set("261.*")
     }
 
     publishPlugin {

@@ -72,10 +72,8 @@ public class AttachmeRunner implements RunProfileState, AttachmeServer.Listener 
     }
     if (delay == 0) {
       String home = System.getenv("HOME");
-      System.out.println("home = " + (home));
       try {
         List<String> strings = Files.readAllLines(Path.of(home + "/.attachme/ATTACHME_DELAY"));
-        System.out.println("strings = " + (strings));
         delay = Long.parseLong(strings.getFirst());
       } catch (Exception e) {
         e.printStackTrace();
