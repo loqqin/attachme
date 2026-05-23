@@ -6,9 +6,16 @@ import com.intellij.execution.*;
 import com.intellij.execution.configurations.*;
 import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.runners.ExecutionEnvironment;
+import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
 import com.intellij.execution.ui.RunContentDescriptor;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowId;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.util.Alarm;
 import org.jdom.Element;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -22,11 +29,25 @@ public class AttachmeDebugger {
   }
 
   public static void attach(Project project, RemoteConnection con, Integer pid) {
-    RunnerAndConfigurationSettings runSettings =
-      RunManager.getInstance(project).createConfiguration("Attachme pid owner: " + pid, ProcessAttachRunConfigurationType.FACTORY);
+    RunnerAndConfigurationSettings runSettings = RunManager.getInstance(project).createConfiguration("Attachme pid owner: " + pid, ProcessAttachRunConfigurationType.FACTORY);
     runSettings.setActivateToolWindowBeforeRun(false);
+    runSettings.setFocusToolWindowBeforeRun(false);
     ((ProcessAttachRunConfiguration) runSettings.getConfiguration()).connection = con;
     ProgramRunnerUtil.executeConfiguration(runSettings, new ProcessAttachDebugExecutor());
+    hideDebugWindowRepeatedly(project, 20);
+  }
+  private static void hideDebugWindowRepeatedly(Project project, int count) {
+    if (count <= 0 || project.isDisposed()) {
+      return;
+    }
+    ApplicationManager.getApplication().invokeLater(() -> {
+      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.DEBUG);
+      if (toolWindow != null && toolWindow.isVisible()) {
+        toolWindow.hide(null);
+      }
+      Alarm alarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, project);
+      alarm.addRequest(() -> hideDebugWindowRepeatedly(project, count - 1), 100);
+    }, ModalityState.nonModal());
   }
 
   public static class ProcessAttachDebugExecutor extends DefaultDebugExecutor {
