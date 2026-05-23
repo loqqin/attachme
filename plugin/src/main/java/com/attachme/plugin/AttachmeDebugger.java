@@ -33,20 +33,21 @@ public class AttachmeDebugger {
     runSettings.setActivateToolWindowBeforeRun(false);
     runSettings.setFocusToolWindowBeforeRun(false);
     ((ProcessAttachRunConfiguration) runSettings.getConfiguration()).connection = con;
+    RunContentDescriptor selected = ExecutionManager.getInstance(project).getContentManager().getSelectedContent();
     ProgramRunnerUtil.executeConfiguration(runSettings, new ProcessAttachDebugExecutor());
-    hideDebugWindowRepeatedly(project, 20);
+    restoreToolWindow(project, ToolWindowId.RUN, 200);
   }
-  private static void hideDebugWindowRepeatedly(Project project, int count) {
-    if (count <= 0 || project.isDisposed()) {
+  private static void restoreToolWindow(Project project, String toolWindowId, int count) {
+    if (count <= 0 || project.isDisposed() || toolWindowId == null) {
       return;
     }
     ApplicationManager.getApplication().invokeLater(() -> {
-      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.DEBUG);
-      if (toolWindow != null && toolWindow.isVisible()) {
-        toolWindow.hide(null);
+      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(toolWindowId);
+      if (toolWindow != null) {
+        toolWindow.activate(null, false);
       }
       Alarm alarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, project);
-      alarm.addRequest(() -> hideDebugWindowRepeatedly(project, count - 1), 100);
+      alarm.addRequest(() -> restoreToolWindow(project, toolWindowId, count - 1), 10);
     }, ModalityState.nonModal());
   }
 
