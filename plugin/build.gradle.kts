@@ -11,7 +11,7 @@ version = "1.2.11"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
@@ -25,7 +25,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-      intellijIdea("2026.1")
+      intellijIdea("2026.2.3")
         bundledPlugin("com.intellij.java")
     }
 }
@@ -36,8 +36,8 @@ dependencies {
 tasks {
     patchPluginXml {
         changeNotes.set("")
-        sinceBuild.set("261")
-        untilBuild.set("261.*")
+        sinceBuild.set("262")
+        untilBuild.set("262.*")
     }
 
     publishPlugin {

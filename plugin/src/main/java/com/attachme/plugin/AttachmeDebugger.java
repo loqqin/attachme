@@ -35,7 +35,7 @@ public class AttachmeDebugger {
     ((ProcessAttachRunConfiguration) runSettings.getConfiguration()).connection = con;
     RunContentDescriptor selected = ExecutionManager.getInstance(project).getContentManager().getSelectedContent();
     ProgramRunnerUtil.executeConfiguration(runSettings, new ProcessAttachDebugExecutor());
-    restoreToolWindow(project, ToolWindowId.RUN, 200);
+    restoreToolWindow(project, ToolWindowId.RUN, 50);
   }
   private static void restoreToolWindow(Project project, String toolWindowId, int count) {
     if (count <= 0 || project.isDisposed() || toolWindowId == null) {
