@@ -1,27 +1,36 @@
 package com.attachme.plugin;
 
+import com.intellij.debugger.DebugEnvironment;
+import com.intellij.debugger.DebuggerManagerEx;
+import com.intellij.debugger.DefaultDebugEnvironment;
+import com.intellij.debugger.engine.DebugProcessImpl;
+import com.intellij.debugger.engine.JavaDebugProcess;
 import com.intellij.debugger.engine.RemoteStateState;
+import com.intellij.debugger.impl.DebuggerSession;
 import com.intellij.debugger.impl.GenericDebuggerRunner;
 import com.intellij.execution.*;
 import com.intellij.execution.configurations.*;
 import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.runners.ExecutionEnvironment;
-import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
+import com.intellij.execution.ProgramRunnerUtil;
 import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowId;
-import com.intellij.openapi.wm.ToolWindowManager;
-import com.intellij.util.Alarm;
+import com.intellij.xdebugger.XDebugProcess;
+import com.intellij.xdebugger.XDebugProcessStarter;
+import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebuggerManager;
+import com.intellij.xdebugger.XSessionStartedResult;
+import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import org.jdom.Element;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class AttachmeDebugger {
 
@@ -32,23 +41,11 @@ public class AttachmeDebugger {
     RunnerAndConfigurationSettings runSettings = RunManager.getInstance(project).createConfiguration("Attachme pid owner: " + pid, ProcessAttachRunConfigurationType.FACTORY);
     runSettings.setActivateToolWindowBeforeRun(false);
     runSettings.setFocusToolWindowBeforeRun(false);
-    ((ProcessAttachRunConfiguration) runSettings.getConfiguration()).connection = con;
-    RunContentDescriptor selected = ExecutionManager.getInstance(project).getContentManager().getSelectedContent();
+    ProcessAttachRunConfiguration conf = (ProcessAttachRunConfiguration) runSettings.getConfiguration();
+    conf.connection = con;
+    conf.setShowConsoleOnStdOut(false);
+    conf.setShowConsoleOnStdErr(false);
     ProgramRunnerUtil.executeConfiguration(runSettings, new ProcessAttachDebugExecutor());
-    restoreToolWindow(project, ToolWindowId.RUN, 50);
-  }
-  private static void restoreToolWindow(Project project, String toolWindowId, int count) {
-    if (count <= 0 || project.isDisposed() || toolWindowId == null) {
-      return;
-    }
-    ApplicationManager.getApplication().invokeLater(() -> {
-      ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(toolWindowId);
-      if (toolWindow != null) {
-        toolWindow.activate(null, false);
-      }
-      Alarm alarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, project);
-      alarm.addRequest(() -> restoreToolWindow(project, toolWindowId, count - 1), 10);
-    }, ModalityState.nonModal());
   }
 
   public static class ProcessAttachDebugExecutor extends DefaultDebugExecutor {
@@ -71,6 +68,65 @@ public class AttachmeDebugger {
     protected RunContentDescriptor createContentDescriptor(@NotNull RunProfileState state, @NotNull ExecutionEnvironment environment)
       throws ExecutionException {
       return attachVirtualMachine(state, environment, ((RemoteState) state).getRemoteConnection(), false);
+    }
+
+    @Nullable
+    @Override
+    protected RunContentDescriptor attachVirtualMachine(RunProfileState state,
+                                                        ExecutionEnvironment env,
+                                                        RemoteConnection connection,
+                                                        long pollTimeout) throws ExecutionException {
+      DebugEnvironment environment = new DefaultDebugEnvironment(env, state, connection, pollTimeout);
+      DebuggerSession debuggerSession = DebuggerManagerEx.getInstanceEx(env.getProject()).attachVirtualMachine(environment);
+      if (debuggerSession == null) {
+        return null;
+      }
+
+      AtomicReference<ExecutionException> ex = new AtomicReference<>();
+      AtomicReference<RunContentDescriptor> result = new AtomicReference<>();
+      ApplicationManager.getApplication().invokeAndWait(() -> {
+        try {
+          DebugProcessImpl debugProcess = debuggerSession.getProcess();
+          XDebugProcessStarter starter = new XDebugProcessStarter() {
+            @Override
+            @NotNull
+            public XDebugProcess start(@NotNull XDebugSession session) {
+              XDebugSessionImpl sessionImpl = (XDebugSessionImpl) session;
+              ExecutionResult executionResult = debugProcess.getExecutionResult();
+              sessionImpl.addExtraActions(executionResult.getActions());
+              if (executionResult instanceof DefaultExecutionResult) {
+                sessionImpl.addRestartActions(((DefaultExecutionResult) executionResult).getRestartActions());
+              }
+              sessionImpl.setPauseActionSupported(true);
+              return JavaDebugProcess.create(session, debuggerSession);
+            }
+          };
+          String sessionName = env.getRunProfile() != null ? env.getRunProfile().getName() : "Attachme";
+          if (sessionName == null) {
+            sessionName = "Attachme";
+          }
+          XSessionStartedResult sessionStartedResult = XDebuggerManager.getInstance(env.getProject())
+            .newSessionBuilder(starter)
+            .sessionName(sessionName)
+            .environment(env)
+            .showTab(true)
+            .showToolWindowOnSuspendOnly(true)
+            .startSession();
+          RunContentDescriptor descriptor = sessionStartedResult.getRunContentDescriptor();
+          if (descriptor != null) {
+            descriptor.setActivateToolWindowWhenAdded(false);
+            descriptor.setAutoFocusContent(false);
+          }
+          result.set(descriptor);
+        } catch (ExecutionException e) {
+          ex.set(e);
+        }
+      }, ModalityState.any());
+
+      if (ex.get() != null) {
+        throw ex.get();
+      }
+      return result.get();
     }
 
     @Override
